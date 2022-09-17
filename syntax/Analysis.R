@@ -58,5 +58,5 @@ VT_PV %>%
   geom_point()
 
 
-plot(density(log(VT_PV$Installation)))
+plot(density(VT_PV$Installation))
 

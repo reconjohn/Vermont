@@ -146,22 +146,30 @@
 
         map.addLayer({
           id: 'installations',
-          type: 'circle',
+          type: 'fill-extrusion',
           source: {
             type: 'geojson',
             data: './data/derived/geo.geojson' // replace this with the url of your own geojson
           },
           paint: {
-            'circle-radius': [
-              'interpolate',
+            // 'fill-extrusion-base': [
+            //   'interpolate',
+            //   ['linear'],
+            //   ['number', ['get', 'Installation']],
+            //   0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            // ],
+            'fill-extrusion-height': [
+            'interpolate',
               ['linear'],
               ['number', ['get', 'Installation']],
-              0,
-              4,
-              5,
-              15
+              0, 0,
+              1, 10000,
+              2, 20000,
+              3, 40000,
+              4, 80000,
+              5, 160000
             ],
-            'circle-color': [
+            'fill-extrusion-color': [
               'interpolate',
               ['linear'],
               ['number', ['get', 'Installation']],
@@ -178,7 +186,7 @@
               5,
               '#AA5E79'
             ],
-            'circle-opacity': 0.8
+            'fill-extrusion-opacity': 0.8
           },
           'filter': ['all', filterYear]
         });

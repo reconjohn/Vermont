@@ -98,7 +98,7 @@ water <-  map_dfr(
 VT_acs_prop <- VT_acs %>% 
   dplyr::select(-moe) %>%
   spread(variable, estimate) %>%
-  ms_erase(water) %>% 
+  # ms_erase(water) %>%
   dplyr::select(GEOID) %>%
   left_join(VT_acs %>% 
               dplyr::select(-moe) %>%
