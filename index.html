@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Demo: Show rooftop solar adoption changes over time with Mapbox GL JS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v2.9.2/mapbox-gl.js"></script>
+    <link
+      href="https://api.tiles.mapbox.com/mapbox-gl-js/v2.9.2/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      }
+
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+
+      h1 {
+        font-size: 20px;
+        line-height: 30px;
+      }
+
+      h2 {
+        font-size: 14px;
+        line-height: 20px;
+        margin-bottom: 10px;
+      }
+
+      a {
+        text-decoration: none;
+        color: #2dc4b2;
+      }
+
+      #console {
+        position: absolute;
+        margin: 10px;
+        width: 240px;
+        background-color: white;
+        padding: 10px 20px;
+      }
+
+      .session {
+        margin-bottom: 20px;
+      }
+
+      .row {
+        height: 12px;
+        width: 100%;
+      }
+
+      .colors {
+        background: linear-gradient(
+          to right,
+          #2dc4b2,
+          #3bb3c3,
+          #669ec4,
+          #8b88b6,
+          #a2719b,
+          #aa5e79
+        );
+        margin-bottom: 5px;
+      }
+
+      .label {
+        width: 15%;
+        display: inline-block;
+        text-align: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="map"></div>
+    <div id="console">
+      <h1>Rooftop Solar Adopton in VT</h1>
+      <p>
+        Data:
+        <a
+          href="https://www.vtenergydashboard.org/statistics"
+          >Vermont rooftop solar adoption by town</a
+        > from EAN
+      </p>
+      <div class="session">
+        <h2>Adoption count in log (log(148) = 5)</h2>
+        <div class="row colors"></div>
+        <div class="row labels">
+          <div class="label">0</div>
+          <div class="label">1</div>
+          <div class="label">2</div>
+          <div class="label">3</div>
+          <div class="label">4</div>
+          <div class="label">5</div>
+        </div>
+      </div>
+      <div class="session">
+        <h2>Year: <label id="active-year">2019</label></h2>
+        <input
+          id="slider"
+          class="row"
+          type="range"
+          min="1999"
+          max="2019"
+          step="1"
+          value="2019"
+        />
+      </div>
+      <!-- <div class="session">
+        <h2>Day of the week</h2>
+        <div class="row" id="filters">
+          <input
+            id="all"
+            type="radio"
+            name="toggle"
+            value="all"
+            checked="checked"
+          />
+          <label for="all">All</label>
+          <input id="weekday" type="radio" name="toggle" value="weekday" />
+          <label for="weekday">Weekday</label>
+          <input id="weekend" type="radio" name="toggle" value="weekend" />
+          <label for="weekend">Weekend</label>
+        </div>
+      </div> -->
+    </div>
+    <script>
+      mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNrMm01aG9hdTBlZGwzbXQ1ZXVrNHNmejAifQ.QHQA0N6XPWddCXtvoODHZg';
+      const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/light-v10',
+        center: [-72.94540, 43.49567],
+        zoom: 7.72,
+        pitch: 45.00
+      });
+
+      map.on('load', () => {
+        let filterYear = ['==', ['number', ['get', 'Year']], 2019];
+        // let filterDay = ['!=', ['string', ['get', 'Day']], 'placeholder'];
+
+        map.addLayer({
+          id: 'installations',
+          type: 'circle',
+          source: {
+            type: 'geojson',
+            data: './data/derived/geo.geojson' // replace this with the url of your own geojson
+          },
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['number', ['get', 'Installation']],
+              0,
+              4,
+              5,
+              15
+            ],
+            'circle-color': [
+              'interpolate',
+              ['linear'],
+              ['number', ['get', 'Installation']],
+              0,
+              '#2DC4B2',
+              1,
+              '#3BB3C3',
+              2,
+              '#669EC4',
+              3,
+              '#8B88B6',
+              4,
+              '#A2719B',
+              5,
+              '#AA5E79'
+            ],
+            'circle-opacity': 0.8
+          },
+          'filter': ['all', filterYear]
+        });
+
+        // update year filter when the slider is dragged
+        document.getElementById('slider').addEventListener('input', (event) => {
+          const year = parseInt(event.target.value);
+          // update the map
+          filterYear = ['==', ['number', ['get', 'Year']], year];
+          map.setFilter('installations', ['all', filterYear]);
+
+          // // converting 0-23 year to AMPM format
+          // const ampm = hour >= 12 ? 'PM' : 'AM';
+          // const hour12 = hour % 12 ? hour % 12 : 12;
+
+          // update text in the UI
+          document.getElementById('active-year').innerText = year;
+        });
+
+        // document
+        //   .getElementById('filters')
+        //   .addEventListener('change', (event) => {
+        //     const day = event.target.value;
+        //     // update the map filter
+        //     if (day === 'all') {
+        //       filterDay = ['!=', ['string', ['get', 'Day']], 'placeholder'];
+        //     } else if (day === 'weekday') {
+        //       filterDay = [
+        //         'match',
+        //         ['get', 'Day'],
+        //         ['Sat', 'Sun'],
+        //         false,
+        //         true
+        //       ];
+        //     } else if (day === 'weekend') {
+        //       filterDay = [
+        //         'match',
+        //         ['get', 'Day'],
+        //         ['Sat', 'Sun'],
+        //         true,
+        //         false
+        //       ];
+        //     } else {
+        //       console.error('error');
+        //     }
+        //     map.setFilter('collisions', ['all', filterHour, filterDay]);
+        //   });
+      });
+    </script>
+  </body>
+</html>
