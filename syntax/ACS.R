@@ -104,10 +104,14 @@ VT_acs_prop <- VT_acs %>%
               dplyr::select(-moe) %>%
               spread(variable, estimate) %>%
               st_drop_geometry(), by = "GEOID") %>% 
-  mutate(City = str_extract(NAME,"([^\\s]+\\s+)+(town|city)") %>% 
-           str_replace_all(c(" city" = "", " town" = ""))) %>% 
+  mutate(NAME = str_extract(NAME, "([^\\s]+\\s+)+(town|city)"),
+         City = ifelse(str_detect(NAME, "(Barre|Rutland|Newport)"),
+                       str_extract(NAME, "^.+(town|city)") %>% 
+                         str_replace_all(c(" town" = " Town", " city" = " City")),
+                       str_extract(NAME, "([^\\s]+\\s+)+(town|city)") %>% 
+                         str_replace_all(c(" town" = "", " city" = ""))),
+         City = ifelse(str_detect(City, "West Rutland"), "West Rutland", City)) %>% 
   filter(!is.na(City))
-
 
 
 ggplot(VT) + 

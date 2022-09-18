@@ -15,8 +15,8 @@ data <- read_csv(file = "./data/raw/Rooftop_solar_VT.csv") %>%
   filter(`Organization Type` == "Residential") %>% 
   mutate(Year = year(`Installation Date`),
          Month = month(`Installation Date`)) %>% 
-  dplyr::select(City, `Zip Code`, Lat, Long, Year, Month) %>% 
-  mutate(City = ifelse(str_detect(City, "(\\s+Town|\\s+City)"), str_replace_all(City, c(" City" = "", " Town" = "")), City))
+  dplyr::select(City, `Zip Code`, Lat, Long, Year, Month)
+  # mutate(City = ifelse(str_detect(City, "(\\s+Town|\\s+City)"), str_replace_all(City, c(" City" = "", " Town" = "")), City))
            
   
 # str(data)

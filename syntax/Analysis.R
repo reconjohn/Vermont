@@ -45,9 +45,15 @@ regrs <- Agg_data(data, VT_acs_prop)
 library(geojsonsf)
 VT_PV <- data %>% 
   group_by(City, Year) %>% 
-  summarise(Installation = log(n())) %>% 
+  summarise(Installation = n()) %>% 
+  complete(Year = 1999:2019, fill = list(Installation = 0)) %>% 
+  mutate(Sum = cumsum(Installation)) %>% 
   left_join(regrs %>% 
-              dplyr::select(City)) %>% 
+              dplyr::select(City, Unit)) %>% 
+  mutate(Sum = Sum/ Unit * 100,
+         Installation = Installation/ Unit * 100) %>% 
+  dplyr::select(-Unit) %>% 
+  gather("Key", "Value", 3:4) %>% 
   st_sf()
 
 st_write(VT_PV, "./data/derived/geo.geojson")
@@ -56,6 +62,11 @@ st_write(VT_PV, "./data/derived/geo.geojson")
 VT_PV %>% 
   ggplot(aes(x = Year, y = Installation)) +
   geom_point()
+
+
+VT_PV %>% 
+  ggplot(aes(x = Installation)) +
+  geom_boxplot()
 
 
 plot(density(VT_PV$Installation))

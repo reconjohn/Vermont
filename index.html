@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Demo: Show rooftop solar adoption changes over time with Mapbox GL JS</title>
+    <title>Rooftop solar adoption changes over time with Mapbox GL JS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v2.9.2/mapbox-gl.js"></script>
     <link
@@ -89,15 +89,15 @@
         > from EAN
       </p>
       <div class="session">
-        <h2>Adoption count in log (log(148) = 5)</h2>
+        <h2>Adoption rate (%)</h2>
         <div class="row colors"></div>
         <div class="row labels">
           <div class="label">0</div>
+          <div class="label">10<sup>-4</sup></div>
+          <div class="label">10<sup>-3</sup></div>
+          <div class="label">10<sup>-2</sup></div>
           <div class="label">1</div>
-          <div class="label">2</div>
-          <div class="label">3</div>
-          <div class="label">4</div>
-          <div class="label">5</div>
+          <div class="label">13</div>
         </div>
       </div>
       <div class="session">
@@ -112,23 +112,22 @@
           value="2019"
         />
       </div>
-      <!-- <div class="session">
-        <h2>Day of the week</h2>
+      <div class="session">
+        <h2>Cumulative rate?</h2>
         <div class="row" id="filters">
           <input
             id="all"
             type="radio"
             name="toggle"
             value="all"
-            checked="checked"
           />
-          <label for="all">All</label>
-          <input id="weekday" type="radio" name="toggle" value="weekday" />
-          <label for="weekday">Weekday</label>
-          <input id="weekend" type="radio" name="toggle" value="weekend" />
-          <label for="weekend">Weekend</label>
+          <label for="all">Yes</label>
+          <input id="no" type="radio" name="toggle" value="no" checked="checked"/>
+          <label for="no">No</label>
+          <!-- <input id="weekend" type="radio" name="toggle" value="weekend" />
+          <label for="weekend">Weekend</label> -->
         </div>
-      </div> -->
+      </div>
     </div>
     <script>
       mapboxgl.accessToken = 'pk.eyJ1IjoibWJ4c29sdXRpb25zIiwiYSI6ImNrMm01aG9hdTBlZGwzbXQ1ZXVrNHNmejAifQ.QHQA0N6XPWddCXtvoODHZg';
@@ -143,7 +142,7 @@
 
       map.on('load', () => {
         let filterYear = ['==', ['number', ['get', 'Year']], 2019];
-        // let filterDay = ['!=', ['string', ['get', 'Day']], 'placeholder'];
+        let filterKey = ['!=', ['string', ['get', 'Key']], 'Sum'];
 
         map.addLayer({
           id: 'installations',
@@ -153,43 +152,37 @@
             data: './data/derived/geo.geojson' // replace this with the url of your own geojson
           },
           paint: {
-            // 'fill-extrusion-base': [
-            //   'interpolate',
-            //   ['linear'],
-            //   ['number', ['get', 'Installation']],
-            //   0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-            // ],
             'fill-extrusion-height': [
             'interpolate',
               ['linear'],
-              ['number', ['get', 'Installation']],
+              ['number', ['get', 'Value']],
               0, 0,
-              1, 10000,
-              2, 20000,
-              3, 40000,
-              4, 80000,
-              5, 160000
+              0.0001, 1000,
+              0.001, 2000,
+              0.01, 4000,
+              1, 16000,
+              13, 170000
             ],
             'fill-extrusion-color': [
               'interpolate',
               ['linear'],
-              ['number', ['get', 'Installation']],
+              ['number', ['get', 'Value']],
               0,
               '#2DC4B2',
-              1,
+              0.0001,
               '#3BB3C3',
-              2,
+              0.001,
               '#669EC4',
-              3,
+              0.01,
               '#8B88B6',
-              4,
+              1,
               '#A2719B',
-              5,
+              13,
               '#AA5E79'
             ],
             'fill-extrusion-opacity': 0.8
           },
-          'filter': ['all', filterYear]
+          'filter': ['all', filterYear, filterKey]
         });
 
         // update year filter when the slider is dragged
@@ -197,7 +190,7 @@
           const year = parseInt(event.target.value);
           // update the map
           filterYear = ['==', ['number', ['get', 'Year']], year];
-          map.setFilter('installations', ['all', filterYear]);
+          map.setFilter('installations', ['all', filterYear, filterKey]);
 
           // // converting 0-23 year to AMPM format
           // const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -207,34 +200,32 @@
           document.getElementById('active-year').innerText = year;
         });
 
-        // document
-        //   .getElementById('filters')
-        //   .addEventListener('change', (event) => {
-        //     const day = event.target.value;
-        //     // update the map filter
-        //     if (day === 'all') {
-        //       filterDay = ['!=', ['string', ['get', 'Day']], 'placeholder'];
-        //     } else if (day === 'weekday') {
-        //       filterDay = [
-        //         'match',
-        //         ['get', 'Day'],
-        //         ['Sat', 'Sun'],
-        //         false,
-        //         true
-        //       ];
-        //     } else if (day === 'weekend') {
-        //       filterDay = [
-        //         'match',
-        //         ['get', 'Day'],
-        //         ['Sat', 'Sun'],
-        //         true,
-        //         false
-        //       ];
-        //     } else {
-        //       console.error('error');
-        //     }
-        //     map.setFilter('collisions', ['all', filterHour, filterDay]);
-        //   });
+        document
+          .getElementById('filters')
+          .addEventListener('change', (event) => {
+            const key = event.target.value;
+            // update the map filter
+            if (key === 'all') {
+            filterKey = [
+                'match',
+                ['get', 'Key'],
+                ['Sum'],
+                true,
+                false
+              ];
+            } else if (key === 'no') {
+              filterKey = [
+                'match',
+                ['get', 'Key'],
+                ['Installation'],
+                true,
+                false
+              ];
+            } else {
+              console.error('error');
+            }
+            map.setFilter('installations', ['all', filterYear, filterkey]);
+          });
       });
     </script>
   </body>
