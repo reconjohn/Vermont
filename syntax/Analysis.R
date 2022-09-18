@@ -60,14 +60,9 @@ st_write(VT_PV, "./data/derived/geo.geojson")
 
 
 VT_PV %>% 
-  ggplot(aes(x = Year, y = Installation)) +
+  filter(Key == "Sum") %>% 
+  ggplot(aes(x = Year, y = Value)) +
   geom_point()
 
 
-VT_PV %>% 
-  ggplot(aes(x = Installation)) +
-  geom_boxplot()
-
-
-plot(density(VT_PV$Installation))
 

@@ -9,13 +9,14 @@ library(lubridate)
 library(forcats)
 library(pander)
 library(stringr)
-
+source("./syntax/Function.R")
 
 data <- read_csv(file = "./data/raw/Rooftop_solar_VT.csv") %>% 
   filter(`Organization Type` == "Residential") %>% 
   mutate(Year = year(`Installation Date`),
-         Month = month(`Installation Date`)) %>% 
-  dplyr::select(City, `Zip Code`, Lat, Long, Year, Month)
+         Month = month(`Installation Date`),
+         kW = `Capacity kW`) %>% 
+  dplyr::select(City, `Zip Code`, Lat, Long, Year, Month, kW)
   # mutate(City = ifelse(str_detect(City, "(\\s+Town|\\s+City)"), str_replace_all(City, c(" City" = "", " Town" = "")), City))
            
   
@@ -60,3 +61,4 @@ data %>%
 
 
 save(data, file = "./data/derived/PV.Rdata")
+write_csv(data, path = "../heat_map/data/derived/PV_heat.csv")
