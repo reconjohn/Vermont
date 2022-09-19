@@ -45,8 +45,7 @@ data %>%
   geom_line(size = 1)+
   scale_x_continuous(breaks = seq(1, 12, by = 1)) +
   xlab("Month") + ylab("Number of installation") +
-  theme_bw() +
-  theme(legend.background = element_rect(fill="transparent"))
+  theme_bw() 
 
 
 data %>% 
@@ -56,8 +55,7 @@ data %>%
   geom_line(size = 1)+
   scale_x_continuous(breaks = seq(1999, 2019, by = 2)) +
   xlab("Year") + ylab("Number of installation") +
-  theme_bw() +
-  theme(legend.background = element_rect(fill="transparent"))
+  theme_bw() 
 
 
 save(data, file = "./data/derived/PV.Rdata")

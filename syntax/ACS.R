@@ -167,7 +167,21 @@ VT_acs_prop <- VT_acs_prop %>%
   filter(Unit != 0)
 # income and home value are missing for communities with small population 
 
+# Data overview
+library(viridis)
+VT_acs_prop %>% 
+       dplyr::select(HomeOwn:Gini) %>% 
+       mutate_at(vars(HomeOwn:Gini), funs(scale(.) %>% as.numeric(.))) %>% 
+  gather("Key", "Value", HomeOwn:Gini) %>% 
+  ggplot() +
+  geom_sf(mapping = aes(fill = Value)) +
+  scale_fill_viridis(direction = -1) +
+  facet_wrap(~Key, nrow = 2) +
+  theme_minimal() 
+
+
 save(VT_acs_prop, file = "./data/derived/ACS.Rdata")
+
 
 
 

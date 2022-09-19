@@ -42,6 +42,7 @@ Agg_data <- function(PV, census_data){
 
 regrs <- Agg_data(data, VT_acs_prop) 
 
+# Adoption rate data
 library(geojsonsf)
 VT_PV <- data %>% 
   group_by(City, Year) %>% 
@@ -59,10 +60,25 @@ VT_PV <- data %>%
 st_write(VT_PV, "./data/derived/geo.geojson")
 
 
+
+# Individual town adoption rate (%)
 VT_PV %>% 
   filter(Key == "Sum") %>% 
-  ggplot(aes(x = Year, y = Value)) +
-  geom_point()
+  ggplot(aes(x = Year, y = Value, group = City)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1999, 2019, by = 2)) +
+  xlab("Year") + ylab("Adoption rate (%)") +
+  theme_bw() 
 
 
+# Cumulative installation 
+data %>% 
+  group_by(Year) %>% 
+  summarise(Installation = n()) %>% 
+  mutate(Sum = cumsum(Installation)) %>% View()
+  ggplot(aes(x = Year, y = Sum)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1999, 2019, by = 2)) +
+  xlab("Year") + ylab("Adoption count") +
+  theme_bw() 
 
