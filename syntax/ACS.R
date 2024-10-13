@@ -18,6 +18,7 @@ source("./syntax/Function.R")
 # census_api_key("a55eefb5e7b0cb86b0b29178435bd74f4cb44c39", install=T, overwrite = T)
 # readRenviron("~/.Renviron")
 
+# getting two dataset: 2018 and 2014
 var_df <- load_variables(2018, "acs5", cache = TRUE)
 # View(var_df)
 
@@ -69,7 +70,7 @@ var_df <- load_variables(2018, "acs5", cache = TRUE)
 variables <- c("B25003_002", "B11011_004","B16010_041","B25077_001", "B19013_001","B19083_001","B25003_001", "B11011_002","B16010_001","B06012_004", "B06012_001","B25081_008", "B25003_003","B01001A_001", "B01001D_001","B01001_001", "B25002_002")
 
 
-VT_acs <- get_acs("county subdivision", state="VT", geometry = TRUE,
+VT_acs <- get_acs("county subdivision", state="VT", year = 2015, geometry = TRUE,
                   variables= variables)
 
 ggplot(VT_acs)+
@@ -89,11 +90,11 @@ VT_counties <- state_map %>% filter(STATEFP == 50) %>% distinct(COUNTYFP) %>% pu
 
 # area_water("VT", county = "011", class = "sf")
 
-water <-  map_dfr(
-  VT_counties,
-  ~ area_water("VT", county = ., class = "sf") %>% filter(AWATER > 10^6)
-) %>%
-  st_union() %>% st_sf()
+# water <-  map_dfr(
+#   VT_counties,
+#   ~ area_water("VT", county = ., class = "sf") %>% filter(AWATER > 10^6)
+# ) %>%
+#   st_union() %>% st_sf()
   
 VT_acs_prop <- VT_acs %>% 
   dplyr::select(-moe) %>%
@@ -105,7 +106,7 @@ VT_acs_prop <- VT_acs %>%
               spread(variable, estimate) %>%
               st_drop_geometry(), by = "GEOID") %>% 
   mutate(NAME = str_extract(NAME, "([^\\s]+\\s+)+(town|city)"),
-         City = ifelse(str_detect(NAME, "(Barre|Rutland|Newport)"),
+         City = ifelse(str_detect(NAME, "(Barre|Rutland|Newport|St. Albans)"),
                        str_extract(NAME, "^.+(town|city)") %>% 
                          str_replace_all(c(" town" = " Town", " city" = " City")),
                        str_extract(NAME, "([^\\s]+\\s+)+(town|city)") %>% 
@@ -142,7 +143,7 @@ VT_acs_prop <- VT_acs_prop %>% # remove weird geometries
          Income = B19013_001,
          White = (B01001A_001)/ B01001_001, 
          # white and asisan/ total population   
-         Poverty = B06012_004/ B06012_001,
+         Wealth = B06012_004/ B06012_001,
          # above 150 percent poverty level/ total population
          Gini = B19083_001) %>% 
   dplyr::select(GEOID, City, Unit:Gini) 
@@ -179,10 +180,7 @@ VT_acs_prop %>%
   facet_wrap(~Key, nrow = 2) +
   theme_minimal() 
 
+VT_acs_2015 <- VT_acs_prop  
 
-save(VT_acs_prop, file = "./data/derived/ACS.Rdata")
-
-
-
-
+save(VT_acs_2020,VT_acs_2014,VT_acs_2015,VT_acs_2016,VT_acs_2017,VT_acs_2018,VT_acs_2019, file = "./data/derived/ACS.Rdata")
 

@@ -50,450 +50,665 @@ library(arm)
 library(pscl)
 library(spatialreg)
 library(ggstance)
+library(viridis)
+library(ggpubr)
+library(ggrepel)
 options(tigris_use_cache = TRUE, tigris_class = "sf")
 
 # uploading library 
 lapply(c("spatstat","colorRamps","tmap","ggmap","geoR","knitr","kableExtra","data.table","gdata","tigris","sf","scales","tidycensus","plotly", "tidyverse", "lubridate"), require, character.only = TRUE)
 
-## Functions 
+source("./syntax/theme_caviz.R")
+# load("./data/derived/total.Rdata") # temp (2020 Vermont data raw)
+load("./data/derived/vermont.Rdata") # temp (2020 Vermont data after cleaning)
+load("./data/derived/RECS.Rdata") # total_data, urban, rural,urbanT, RuralT from RECS_U.R
+load("./data/derived/A_comparison.Rdata") # total_data2 
+# (RECS model results of the three technology relationship)
+load("./data/derived/official_data.Rdata") 
+# data (RECS), dataU, dataR, burden, pre (republican), US (state data), us (US border), vt (VT border)
 
-## Point clustering and density 
-##
-Density_plot <- function(Total_Permit, PV, EV, Win){
-  ## Total 
-  totgeo <- as.data.frame(Total_Permit[,c(6,7)])
-  # plot(totgeo,pch = 4, cex = 0.6)
-  ppptotgeo <- as.ppp(totgeo, W= Win)
-  # plot(ppptotgeo) 
-  
-  dentot <- as(as(density(ppptotgeo, 0.004), "SpatialGridDataFrame"), "SpatialPixelsDataFrame")
-  
-  
-  ## PV
-  ## Density plot
-  geo <- as.data.frame(PV[,c(6,7)])
-  # plot(geo,pch = 4, cex = 0.6)
-  pppgeo <- as.ppp(geo, W= Win)
-  # plot(pppgeo)
-  
-  ## Clustering check
-  PV_evn <- envelope(pppgeo, fun= Gest, nrank= 2, nsim= 99)
-  
-  
-  den <- as(as(density(pppgeo, 0.004), "SpatialGridDataFrame"), "SpatialPixelsDataFrame")
-  # plot(den, col=blue2red(20))
-  # what is the unit of the graph?
-  
-  
-  ## relative density
-  scaled_den = (den$v - mean(den$v))/ sd(den$v)
-  scaled_dentot = (dentot$v - mean(dentot$v))/ sd(dentot$v)
-  den_PV <- den
-  den_PV@data$v <- (scaled_den - scaled_dentot) 
-  
-  ## EV
-  ## Density plot
-  geo <- as.data.frame(EV[,c(6,7)])
-  # plot(geo,pch = 4, cex = 0.6)
-  pppgeo <- as.ppp(geo, W= Win)
-  # plot(pppgeo)
-  
-  ## Clustering check
-  EV_evn <- envelope(pppgeo, fun= Gest, nrank= 2, nsim= 99)
-  
-  den <- as(as(density(pppgeo, 0.004), "SpatialGridDataFrame"), "SpatialPixelsDataFrame")
-  # plot(den, col=blue2red(20))
-  # what is the unit of the graph?
-  
-  ## relative density
-  scaled_den = (den$v - mean(den$v))/ sd(den$v)
-  den_EV <- den
-  den_EV@data$v <- (scaled_den - scaled_dentot) 
-  
-  
-  result <- list(dentot, PV_evn, den_PV, EV_evn, den_EV)
-  return(result) # total housing unit density, PV, and EV density, G estimates 
-  
-}
-
-# load("./data/derived/Seattle_Data.Rdata")
-# Win <- owin(c(-122.45, -122.20), c(47.49, 47.74)) # Seattle
-#
-# result <- Density_plot(Total_Permit, PV, EV, Win)
+# # data 
+# ## RECS
+# data <- read_csv(file = "./data/raw/recs2020.csv") %>% 
+#   dplyr::select(UATYP10, state_postal, TYPEHUQ, KOWNRENT, EQUIPM, FUELHEAT, SOLAR, ELECVEH, EVCHRGHOME, 
+#                 EDUCATION, HOUSEHOLDER_RACE, MONEYPY) %>% 
+#   filter(UATYP10 != "C") %>%
+#   mutate(urban = UATYP10,
+#          state = state_postal,
+#          SingleFamily = ifelse(TYPEHUQ %in% c(2,3), 1, 0),
+#          HomeOwn = ifelse(KOWNRENT == 1, 1, 0),
+#          Pump = ifelse(EQUIPM %in% c(4,13), 1, 0),
+#          PV = ifelse(SOLAR == 1, 1, 0),
+#          EV = ELECVEH,
+#          EVC = ifelse(EVCHRGHOME == 1, 1, 0),
+#          Edu = ifelse(EDUCATION %in% c(4,5), 1, 0),
+#          White = ifelse(HOUSEHOLDER_RACE == 1, 1, 0),
+#          Income = rescale(MONEYPY),
+#          Income = ifelse(Income > mean(Income), 1, 0)) %>% 
+#   replace_na(list(EVC = 0)) %>% 
+#   dplyr::select(state, urban, SingleFamily, HomeOwn, Edu, White, Income, PV, EV, EVC, Pump)
 # 
-# plot(result[[1]], col=blue2red(20))
-# title("Residential density in Seattle")
+# # dataT <- read_csv(file = "./data/raw/recs2020.csv") %>% 
+# #   dplyr::select(UATYP10, state_postal, TYPEHUQ, KOWNRENT, EQUIPM, FUELHEAT, SOLAR, ELECVEH, EVCHRGHOME, 
+# #                 EDUCATION, HOUSEHOLDER_RACE, MONEYPY) %>% 
+# #   filter(UATYP10 != "C") %>% 
+# #   mutate(urban = UATYP10,
+# #          state = state_postal,
+# #          SingleFamily = ifelse(TYPEHUQ %in% c(2,3), 1, 0),
+# #          HomeOwn = ifelse(KOWNRENT == 1, 1, 0),
+# #          Pump = ifelse(EQUIPM %in% c(4,13), 1, 0),
+# #          PV = ifelse(SOLAR == 1, 1, 0),
+# #          EV = ELECVEH,
+# #          EVC = ifelse(EVCHRGHOME == 1, 1, 0),
+# #          Edu = ifelse(EDUCATION %in% c(4,5), 1, 0),
+# #          White = ifelse(HOUSEHOLDER_RACE == 1, 1, 0),
+# #          Income = rescale(MONEYPY)) %>% 
+# #   replace_na(list(EVC = 0)) %>% 
+# #   dplyr::select(state, urban, SingleFamily, HomeOwn, Edu, White, Income, PV, EV, EVC, Pump)
 # 
-# plot(result[[2]], main="PV G function")
-# plot(result[[3]], col=blue2red(20))
-# title("Residential PV density in Seattle")
 # 
-# plot(result[[4]], main="EV G function")
-# plot(result[[5]], col=blue2red(20))
-# title("Residential EV density in Seattle")
-#
-# load("./data/derived/Bellevue_Data.Rdata") # Bellevue 
-# Win <- owin(c(-122.25, -122.07), c(47.51, 47.68)) # Bellevue 
+# dataU <- 
+#   data %>% 
+#   filter(urban == "U")
+# 
+# dataR <- 
+#   data %>% 
+#   filter(urban == "R")
+# 
+# # housing unit
+# st <- bind_rows(lapply(state.abb, function(x){
+#   get_acs(
+#     "state",
+#     variables = "B25003_001", # housing unit
+#     state = x,
+#     year = 2020,
+#     survey = "acs5",
+#     geometry = TRUE,
+#     cache_table = TRUE) %>%
+#     mutate(State = x)}))
+# 
+# 
+# # US <- st %>% 
+# #   inner_join(data %>% 
+# #   group_by(state) %>% 
+# #   summarise(pop = n(),
+# #             Urban = sum(urban == "U"),
+# #             Rural = sum(urban == "R"),
+# #             PV = sum(PV),
+# #             EV = sum(EV),
+# #             Pump = sum(Pump)), by = c("State" = "state")) %>% 
+# #   ungroup() %>% 
+# #   mutate(Urban = Urban/pop,
+# #          Rural = Rural/pop,
+# #          `Rooftop solar` = PV/pop,
+# #          `Electric vehicle` = EV/pop,
+# #          `Heat pump` = Pump/pop) %>% 
+# #   mutate_at(vars(`Rooftop solar`:`Heat pump`), funs(scale(.) %>% as.numeric())) %>% 
+# #   gather(key, value, `Rooftop solar`:`Heat pump`) %>% 
+# #   mutate(key = factor(key, levels = c("Rooftop solar","Electric vehicle","Heat pump")))
+# 
+# # energy cost
+# br <- read_csv(file = "./data/raw/burden.csv")  # LEAD for 2018
+# 
+# # median income 2018
+# inc <- bind_rows(lapply(state.abb, function(x){
+#   get_acs(
+#     "state",
+#     variables = "B19013_001",
+#     state = x,
+#     year = 2018,
+#     survey = "acs5",
+#     geometry = F,
+#     cache_table = TRUE) %>%
+#     mutate(State = x)}))
+# 
+# 
+# burden <- inc %>% 
+#   dplyr::select(State, estimate) %>% 
+#   rename(state = State,
+#          Income = estimate) %>% 
+#   left_join(br %>% 
+#               rename(state = Name), by = "state") %>% 
+#   mutate(Burden = Cost/Income*100)
+# 
+# # adding political data 
+# # republican 
+# ## adding political data by state 
+# pre <- read_csv(file = "./data/raw/countypres.csv") %>% 
+#   filter(party == "REPUBLICAN") %>% 
+#   filter(totalvotes > 0) %>% 
+#   filter(year > 2012) %>% 
+#   group_by(state_po) %>% 
+#   summarise(candi = sum(candidatevotes),
+#             total = sum(totalvotes),
+#             Republican = candi/ total*100) %>% 
+#   rename(state = state_po) %>% 
+#   ungroup()
+# 
+# 
+# # pre <- read_csv(file = "./data/raw/countypres.csv") %>% 
+# #   filter(party == "REPUBLICAN") %>% 
+# #   filter(totalvotes > 0) %>% 
+# #   mutate(ratio = candidatevotes/ totalvotes) %>% 
+# #   pivot_wider(names_from = year, values_from = ratio) %>% 
+# #   rename(fips = county_fips)
+# # 
+# # pre <- pre %>% 
+# #   dplyr::select(fips, "2000":"2020") %>% 
+# #   group_by(fips) %>% 
+# #   dplyr::summarise_all(sum, na.rm = T) %>% 
+# #   rename(Politics = `2016`) %>% 
+# #   mutate(Politics = Politics*100)
+# 
+# # get pre and burden from state_analysis.R
+# US <- st %>% 
+#   rename(total_housing = estimate) %>% 
+#   inner_join(data %>% 
+#                group_by(state) %>% 
+#                summarise(pop = n(),
+#                          Urban = sum(urban == "U"),
+#                          Rural = sum(urban == "R"),
+#                          PV = sum(PV),
+#                          EV = sum(EV),
+#                          Pump = sum(Pump)), by = c("State" = "state")) %>% 
+#   ungroup() %>% 
+#   left_join(pre, by = c("State" = "state")) %>% 
+#   left_join(burden, by = c("State" = "state")) %>% 
+#   mutate(Urban = Urban/pop,
+#          Rural = Rural/pop,
+#          `Rooftop solar` = 100*PV/pop,
+#          `Electric vehicle` = 100*EV/pop,
+#          `Heat pump` = 100*Pump/pop) 
+# 
+# # US border
+# us <- st %>% 
+#   filter(!State %in% c("HI","AK")) %>% 
+#   st_union() %>% 
+#   st_as_sf()
+# 
+# 
+# # VT border
+# vt <- temp %>% 
+#   st_union() %>% 
+#   st_as_sf()
 
+# save(data, dataU, dataR, burden, pre, US, us, vt, file = "./data/derived/official_data.Rdata")
 
-## Point Mapping 
-##
-Point_map <- function(PV, EV, dens = F){
-  if(dens == F){
-    qmplot(data = PV, 
-           x = Lon, 
-           y = Lat, 
-           color = I("#342c5c"), 
-           alpha = I(0.3)) +
-      geom_point(aes(x = Lon, y = Lat, color = "red"),
-                 data = EV, shape = 2)
-  } else {
-    qmplot(data = PV, geom = "blank",
-           x = Lon, y = Lat, 
-           maptype = "toner-lite", 
-           darken = 0.1) + 
-      stat_density_2d(
-        aes(fill = stat(level)),
-        geom = "polygon", 
-        alpha = .2, color = NA) + 
-      scale_fill_gradient2(
-        "PV\nConcentration", 
-        low = "white", 
-        mid = "yellow", 
-        high = "red") + 
-      theme(legend.position = "bottom")
+################################################################################ function 
+### modeling among Vermont technologies  
+sim_countf <- function(data, tech){
+  
+  if(tech == "PV"){
+    rho <- "Rho.PV"
+    tech1 <- "r_EV"
+    tech2 <- "r_Pump"
+  }else if(tech == "EV"){
+    rho <- "Rho.EV"
+    tech1 <- "r_PV"
+    tech2 <- "r_Pump"
+  }else{
+    rho <- "Rho.Pump"
+    tech1 <- "r_EV"
+    tech2 <- "r_PV"
   }
-} # point or density map 
-
-# Point_map(PV, EV, F)
-# Point_map(PV, EV, T)
-
-
-## Time trend 
-##
-Trend_plot <- function(PV, EV){
   
-  PEV <- PV %>% 
-    group_by(Class, Year) %>% 
-    summarise(PV = n()) %>% 
-    left_join(EV %>% 
-                group_by(Class, Year) %>% 
-                summarise(EV = n()), by = c("Class", "Year")) %>% 
-    gather(Technology, value, PV, EV) %>% 
-    mutate(Technology = parse_factor(Technology, levels = c("PV", "EV")))
   
-  PEV$value[is.na(PEV$value)] = 0
+  data <- data %>% st_drop_geometry() %>% 
+    mutate(SingleFamily = ifelse(SingleFamily > mean(SingleFamily), 1,0),
+           HomeOwn = ifelse(HomeOwn > mean(HomeOwn), 1,0),
+           Edu = ifelse(Edu > mean(Edu), 1,0),
+           White = ifelse(White > mean(White), 1,0),
+           Income = ifelse(Income > mean(Income), 1,0)) %>% 
+    mutate_at(vars(HomeOwn:White,r_PV:r_Pump,Rho.PV:Rho.Pump), funs(rescale(.) %>% as.numeric(.)))
   
-  PEV_plot <- PEV %>% 
-    ggplot(aes(x = Year, y = value, group = Technology, color = Technology))+
-    facet_wrap( ~ Class) +
-    geom_line(size = 2)+
-    xlab("Year") + ylab("Number of installation") +
-    theme_bw() +
-    theme(legend.position = c(0.90, 0.25),
-          legend.background = element_rect(fill="transparent"),
-          strip.text = element_text(size = 17),
-          legend.text = element_text(size = 12),
-          text = element_text(size = 15)) +
-    scale_x_continuous(breaks = seq(2000, 2019, by = 5))
   
-  return(list(PEV, PEV_plot)) # PV, EV installation trend
+  fit <- glm.nb(get(tech) ~ SingleFamily+HomeOwn+Edu+White+Income+get(rho)+get(tech1)+get(tech2)+
+                  offset(log(Unit)), data = data)
+  
+  x <- data %>%                  
+    dplyr::select(SingleFamily,HomeOwn,Edu,White,Income,rho,tech1,tech2) %>%
+    summarize_all(mean) %>%   # summarize the means for most variables (can't average Species)
+    uncount(4) %>%  # repeat 
+    mutate(cont = 1) %>% 
+    relocate(cont) %>% as.matrix()
+  
+  x[1,8] <- 1
+  x[2,9] <- 1
+  
+  x[3,8] <- 0
+  x[4,9] <- 0
+  
+  
+  
+  sims <- 10000
+  pe <- fit %>% tidy() %>% dplyr::select(estimate) %>% as.matrix()
+  vc <- vcov(fit)
+  simbetas <- mvrnorm(sims, pe, vc)
+  xbeta <- x %*% t(simbetas) %>% exp()
+  xbeta <- xbeta*mean(get("Unit", data))
+  
+  xbeta <- xbeta[1:2,] - xbeta[3:4,]
+  
+  pe <- apply(xbeta, 1, mean) 
+  upper <- apply(xbeta, 1, quantile, probs= 0.975) 
+  lower <- apply(xbeta, 1, quantile, probs= 0.025)
+  
+  total_pe <- cbind(pe,upper,lower) %>%
+    as.data.frame() %>% 
+    mutate(group = c(tech1, tech2),
+           tech = tech)
+  
+  return(total_pe)
 }
 
-# result <- Trend_plot(PV, EV)
-# result[[2]]
-# result[[1]]
-
-
-## PV, EV relationship 
-##
-Relationship_plot <- function(PV, EV){
+# creating figure
+sim_plot <- function(total_pe, tech){
+  Var <- tech
+  fig <- total_pe %>%
+    filter(tech == Var) %>% 
+    ggplot(aes(y = reorder(group,pe),
+               x = pe,
+               xmax = upper,
+               xmin = lower,
+               color = urban)) +
+    geom_pointrangeh(position = position_dodge2v(height = 0.7), fatten = 2, size = 0.8, shape = 15) +
+    # scale_color_grey()+
+    geom_vline(xintercept = 0, color ="black", linetype = "dashed", size = 0.5)+
+    scale_x_continuous(# limits = c(min(total_pe[3]), max(total_pe[2])),
+      # breaks = seq(0, max(total_pe), by =0.01),
+      # labels = c("0%", "+1%", "+2%"),
+      sec.axis =  sec_axis(~ ., name = "")) + # sec.axis = sec_axis(~ . - mean(sp_regime$Adoption), name = "Deviation from Mean %")
+    labs(title = "", x = paste(tech ,"\nadoption\ndifference [%]"), y = "", colour = "Area") +
+    theme_minimal() + 
+    theme(plot.background = element_blank(),
+          panel.grid.minor = element_blank())
   
-  PEV_join <- PV %>% 
-    distinct(Lat, Lon,.keep_all=TRUE) %>%
-    inner_join(EV %>% 
-                 distinct(Lat, Lon,.keep_all=TRUE), 
-               by = c("Lat", "Lon"))
-  
-  # glimpse(PEV_join)
-  # View(PEV_join)
-  
-  ## plot
-  PEV_join_plot1 <- PEV_join %>% 
-    ggplot(aes(x = Date.x, y = Date.y))+
-    geom_point(alpha = 0.5, size = 2) +
-    geom_abline(color = "red", size = 1) +
-    geom_smooth(method = "lm", se = T) +
-    xlab("PV install date") + ylab("EV install date") +
-    theme_bw() +
-    theme(legend.position = c(0.90, 0.25),
-          legend.background = element_rect(fill="transparent"))
-  
-  ## plot after outliers removed 
-  PEV_join_plot2 <- PEV_join %>%
-    filter(Date.x > as.Date("2012/01/01", "%Y/%m/%d"),
-           Date.y > as.Date("2012/01/01", "%Y/%m/%d")) %>%
-    ggplot(aes(x = Date.x, y = Date.y))+
-    geom_point(alpha = 0.5, size = 2) +
-    geom_abline(color = "red", size = 1) +
-    geom_smooth(method = "lm", se = T, aes(color = "correlation")) +
-    scale_colour_manual(name="Legend", values=c("blue", "red")) + 
-    xlab("PV install date") + ylab("EV install date") +
-    theme_bw() +
-    theme(legend.position = c(0.90, 0.25),
-          legend.background = element_rect(fill="transparent"))
-  
-  return(list(PEV_join_plot1, PEV_join_plot2))
-}
-
-# result <- Relationship_plot(PV, EV)
-# result[[1]]
-# result[[2]]
-
-
-
-## ACS plot
-##
-# ggplot(bellevue_tracts) + 
-#   geom_sf(fill = "white") + 
-#   theme_minimal() 
-
-ACS_plot <- function(tracts){
-  
-  king_water <- area_water("WA", "King", class = "sf")
-  
-  tracts %>%
-    st_difference(st_union(king_water)) %>% 
-    gather("var","value", PopDensity:Gini) %>% 
-  ggplot() +
-  geom_sf(aes(fill = value), size = .25) +
-  facet_wrap(vars(var)) +
-  scale_fill_viridis_c() + 
-  theme_void()
-
-}
-
-# load("./data/derived/ACS.Rdata")
-# ACS_plot(WA_tracts)
-# ACS_plot(seattle_tracts)
-# ACS_plot(bellevue_tracts)
-
-## Aggregation per census tract
-## PV and EV counts 
-Agg_data <- function(PV, EV, census_data){
-
-  PV <- st_as_sf(PV, coords = c("Lon", "Lat"), crs = 4326,
-                       agr = "constant",
-                       stringsAsFactors = FALSE,
-                       remove = TRUE)
-  
-  EV <- st_as_sf(EV, coords = c("Lon", "Lat"), crs = 4326,
-                       agr = "constant",
-                       stringsAsFactors = FALSE,
-                       remove = TRUE)
-  
-  # st_crs(PV)
-  
-  census <- census_data %>% st_transform(4326)
-  
-  # PV
-  in_tract <- st_join(PV, census, join = st_within)
-  # join sf objects based on geometry, point data joined with polygons  
-  
-  # PV count per census tract
-  tract_count <- count(as_tibble(in_tract), GEOID)
-  
-  # ACS joined with PV count
-  tract_sf <- left_join(census, tract_count) %>% 
-    dplyr::rename(PV = n)
-  
-  # EV
-  in_tract <- st_join(EV, census, join = st_within)
-  # join sf objects based on geometry 
-  
-  # count per census tract
-  tract_count <- count(as_tibble(in_tract), GEOID)
-  
-  tract_sf <- left_join(tract_sf, tract_count) %>% 
-    dplyr::rename(EV = n) 
-  
-  tract_sf[is.na(tract_sf[["PV"]]),"PV"] <- 0 # fill zero at empty value
-  tract_sf[is.na(tract_sf[["EV"]]),"EV"] <- 0
-  tract_sf$HomeValue[is.na(tract_sf$HomeValue)] <- mean(tract_sf$HomeValue, na.rm = T)
-  
-  N = sum(tract_sf$Unit) # total number of housing units in Seattle
-  ExpectedPV = sum(tract_sf$PV, na.rm = T)/ N # total number of PV/ N, expected pv per one housing unit
-  ExpectedEV = sum(tract_sf$EV, na.rm = T)/ N # total number of EV/ N
-  
-  
-  regrs <- tract_sf %>%
-    mutate(PV = PV + 1, # ifelse(PV == 0, 0.5, PV)
-           EV = EV + 1, # ifelse(EV == 0, 0.5, EV)
-           Exp_PV = Unit*ExpectedPV + 1, # expected PV for the census tract
-           Exp_EV = Unit*ExpectedEV + 1,
-           SIR_PV = PV/ Exp_PV,
-           SIR_EV = EV/ Exp_EV,
-           SE_SIR_PV = sqrt(SIR_PV/ Exp_PV),
-           SE_SIR_EV = sqrt(SIR_EV/ Exp_EV))
-
-  return(regrs)
-}
-
-# regrs_seattle <- PVEV_Seattle <- Agg_data(PV, EV, seattle_tracts)
-# regrs_bellevue <- Agg_data(PV_Bel, EV_Bel, bellevue_tracts)
-
-## Agg data for portland
-Agg_data_port <- function(PV, census_data){
-  
-  PV <- st_as_sf(PV, coords = c("Lon", "Lat"), crs = 4326,
-                 agr = "constant",
-                 stringsAsFactors = FALSE,
-                 remove = TRUE)
-  
-  # st_crs(PV)
-  
-  census <- census_data %>% st_transform(4326)
-  
-  # PV
-  in_tract <- st_join(PV, census, join = st_within)
-  # join sf objects based on geometry, point data joined with polygons  
-  
-  # PV count per census tract
-  tract_count <- count(as_tibble(in_tract), GEOID)
-  
-  # ACS joined with PV count
-  tract_sf <- left_join(census, tract_count) %>% 
-    rename(PV = n)
-  
-  
-  tract_sf[is.na(tract_sf[["PV"]]),"PV"] <- 0 # fill zero at empty value
-  tract_sf$HomeValue[is.na(tract_sf$HomeValue)] <- mean(tract_sf$HomeValue, na.rm = T)
-  
-  N = sum(tract_sf$Unit) # total number of housing units in Seattle
-  ExpectedPV = sum(tract_sf$PV, na.rm = T)/ N # total number of PV/ N, expected pv per one housing unit
-  
-  
-  regrs <- tract_sf %>%
-    mutate(PV = PV+1, # ifelse(PV == 0, 0.5, PV)
-           Exp_PV = Unit*ExpectedPV +1, # expected PV for the census tract
-           SIR_PV = PV/ Exp_PV,
-           SE_SIR_PV = sqrt(SIR_PV/ Exp_PV))
-  
-  return(regrs)
+  if(Var == "Rooftop solar"){
+    fig <- fig + 
+      ggtitle("d") + 
+      theme(aspect.ratio = 1.1,
+            axis.text.x = element_text(color = "black", size = 10),
+            axis.ticks.x = element_blank(),
+            legend.position = c(0.99, 0.35),
+            axis.line.x = element_line(color="black"),
+            plot.title = element_text(hjust = -1.1),
+            legend.background = element_rect(size=0.5, linetype="solid"),
+            legend.text = element_text(size=7),
+            legend.title = element_text(size=8),
+            legend.key.height= unit(0.3, 'cm'),
+            legend.key.width= unit(0.3, 'cm'))
+  }else if(Var == "Heat pump"){
+    fig <- fig +
+      theme(aspect.ratio = 1.1,
+            axis.text.x = element_text(color = "black", size = 10),
+            axis.ticks.x = element_blank(),
+            legend.position = "none",
+            axis.line.x = element_line(color="black"),
+            plot.title = element_text(hjust = -1))
+  }else{
+    fig <- fig +
+      theme(aspect.ratio = 1.1,
+            axis.text.x = element_text(color = "black", size = 10),
+            axis.ticks.x = element_blank(),
+            legend.position = "none",
+            legend.text = element_text(size=7),
+            legend.title = element_text(size=7),
+            axis.line.x = element_line(color="black"))
+    # legend.background = element_rect(size=0.5, linetype="solid"))
+  }
+  return(fig)
 }
 
 
-## Plot variables 
-
-fill_plot <- function(regrs, variable, title){
-  regrs %>% 
-    ggplot(aes(fill=!!sym(variable))) + 
-    geom_sf(size=0.1, color="white") + 
-    coord_sf(datum=NA) + 
-    scale_fill_continuous(name="Value", 
-                          type ="viridis") + 
-    theme_minimal() + ggtitle(title)
+### energy burden modeling 
+b_countf <- function(data, tech){
+  
+  
+  if(tech == "PV"){
+    rho <- "Rho.PV"
+  }else if(tech == "EV"){
+    rho <- "Rho.EV"
+  }else{
+    rho <- "Rho.Pump"
+  }
+  
+  
+  data <- data %>% st_drop_geometry() %>% 
+    mutate(Bur = Exp*100/ Income) %>% 
+    mutate(SingleFamily = ifelse(SingleFamily > mean(SingleFamily), 1,0),
+           HomeOwn = ifelse(HomeOwn > mean(HomeOwn), 1,0),
+           Edu = ifelse(Edu > mean(Edu), 1,0),
+           White = ifelse(White > mean(White), 1,0),
+           Income = ifelse(Income > mean(Income), 1,0)) %>% 
+    mutate_at(vars(PV:Pump), funs(rescale(., to=c(0,100)) %>% as.numeric(.) %>% 
+                                    round(0))) %>% 
+    mutate_at(vars(Rho.PV:Rho.Pump), funs(rescale(.) %>% as.numeric(.)))
+  
+  
+  fit <- glm.nb(get(tech) ~ SingleFamily+HomeOwn+Edu+White+Income+get(rho)+Bur+Republican+
+                  offset(log(Unit)), data = data)
+  
+  # to compare with predict function result 
+  # new <- data %>% 
+  #   mutate_at(vars(Unit:Exp, Rho.PV:Rho.Pump), funs(mean(.)))
+  # 
+  # new <- new[1:20, ] %>% 
+  #   mutate({{rho}} := seq(0,1, length.out = 20))
+  # 
+  # predict(fit, new, type = "response")
+  
+  
+  x <- data %>%                    
+    dplyr::select(SingleFamily,HomeOwn,Edu,White,Income,rho, Bur, Republican) %>% 
+    summarize_all(mean) %>%
+    uncount(20) %>% 
+    mutate(Bur = seq(0, 13, length.out = 20),
+           cont = 1
+    ) %>% 
+    relocate(cont)
+  
+  x <- x %>% 
+    as.matrix()
+  
+  sims <- 10000
+  pe <- fit %>% tidy() %>% dplyr::select(estimate) %>% as.matrix()
+  vc <- vcov(fit)
+  simbetas <- mvrnorm(sims, pe, vc)
+  xbeta <- x %*% t(simbetas) %>% exp()
+  xbeta <- xbeta*mean(get("Unit", data))
+  
+  pe <- apply(xbeta, 1, mean) 
+  upper <- apply(xbeta, 1, quantile, probs= 0.975)
+  lower <- apply(xbeta, 1, quantile, probs= 0.025)
+  
+  total_pe <- cbind(pe,upper,lower, x %>% 
+                      as.data.frame() %>% 
+                      dplyr::select(Bur)) %>%
+    as.data.frame() %>% 
+    mutate(tech = tech)
+  
+  return(total_pe)
 }
 
-# regrs <- Agg_data(PV, EV, seattle_tracts)
-# fill_plot(regrs,"SIR_PV","SIR in Seattle")
-# fill_plot(regrs,"poisres","Residuals of possison model")
-
-Clustering_plot <- function(regrs_sf, PV = T, city){
-  
-  regrs_sp <- regrs_sf %>% as("Spatial") # make it to sp
-  
-  if(PV){
-    SIR <- regrs_sp$SIR_PV
-    Tech <- "PV"} else {
-      SIR <- regrs_sp$SIR_EV
-      Tech <- "EV"
-    }
-  
-  nb.map <- poly2nb(regrs_sp, queen=T)
-  # summary(nb.map)
-  # nb2INLA("seattle.graph", nb.map)
-  # nb2INLA("bellevue.graph", nb.map)
-  
-  W <- nb2listw(nb.map, style= "W", zero.policy= T) 
-  # zero.policy removes cases with no neighbors 
-  # plot(regrs_sp, border = "grey60")
-  # plot(W, coordinates(regrs_sp), add=T, col=2) 
-  
-  ## Getis-Ord (heatmap)
-  nb.map.self <- include.self(nb.map)
-  W.self <- nb2listw(nb.map.self, style="W", zero.policy= TRUE)
-  # plot(regrs_sp, border = "grey60")
-  # plot(W.self, coordinates(regrs_sp), add=T, col=2) 
+### republican modeling 
+r_countf <- function(data, tech){
   
   
-    ### PV
-    localgstar<-localG(SIR, W.self, zero.policy = TRUE)
-    # local cluster of high or low values 
-    # summary(localgstar)
-    
-    regrs_sf <- mutate(regrs_sf, localgstar = as.numeric(localgstar))
-    
-    # tm_shape(regrs_sf, unit = "km") +
-    #   tm_polygons(col = "localgstar", title = "Gi* value", palette = "-RdBu", 
-    #               style = "quantile", n=10) +
-    #   tm_scale_bar(breaks = c(0, 10, 20), text.size = 1) +
-    #   tm_layout(frame = F, main.title = "PV clusters",
-    #             legend.outside = T)
-    
-    breaks <- c(-Inf, -2.58, -1.96, -1.65, 1.65, 1.96, 2.58, Inf)
-    # tm_shape(regrs_sf, unit = "km") +
-    #   tm_polygons(col = "localgstar", title = "Gi* value", palette = "-RdBu",
-    #               breaks = breaks) +
-    #   tm_scale_bar(breaks = c(0, 10, 20), text.size = 1) +
-    #   tm_layout(frame = F, main.title = "Seattle PV clusters",
-    #             legend.outside = T)
-
-    
-    regrs_sf <-  mutate(regrs_sf, 
-                        gcluster = cut(localgstar, breaks=breaks, include.lowest = TRUE, 
-                                       labels=c("Cold spot: 99% confidence", 
-                                                "Cold spot: 95% confidence", 
-                                                "Cold spot: 90% confidence", 
-                                                "Not significant","Hot spot: 90% confidence",
-                                                "Hot spot: 95% confidence", 
-                                                "Hot spot: 99% confidence"))) 
-    
-    tm_plot <- tm_shape(regrs_sf, unit = "km") +
-      tm_polygons(col = "gcluster", title = "", palette = "-RdBu", 
-                  breaks = breaks) +
-      tm_scale_bar(breaks = c(0, 10, 20), text.size = 1) +
-      tm_layout(frame = F, main.title = paste(city, Tech, "clusters"),
-                legend.outside = T)
-    
-    
-    # tmap_mode("view")
-    # tm_PV + tm_view(basemaps="OpenStreetMap")
-    
-    
-    ## Local Moran's I - comparison btw neighbor and feature
-    locali<-localmoran(SIR, W, p.adjust.method="bonferroni")
-    regrs_sf <- mutate(regrs_sf, localmi = locali[,1], localz = locali[,4])
-    regrs_sf <- mutate(regrs_sf, mcluster = cut(localz, breaks = c(min(localz),-1.96, 1.96, max(localz)), include.lowest = TRUE, labels = c("Negative Correlation", "Not Significant", "Positive Correlation")))
-    
-    # tm_shape(regrs_sf, unit = "km") +
-    #   tm_polygons(col = "mcluster", title = "", palette = "-RdBu", 
-    #               breaks = breaks) +
-    #   tm_scale_bar(breaks = c(0, 10, 20), text.size = 1) +
-    #   tm_compass(type = "4star", position = c("left", "bottom")) +
-    #   tm_layout(frame = F, main.title = "Seattle PV clusters",
-    #             legend.outside = T)
-
-  return(list(regrs_sp, W, tm_plot))
+  if(tech == "PV"){
+    rho <- "Rho.PV"
+  }else if(tech == "EV"){
+    rho <- "Rho.EV"
+  }else{
+    rho <- "Rho.Pump"
+  }
   
+  
+  data <- data %>% st_drop_geometry() %>% 
+    mutate(Bur = Exp*100/ Income) %>% 
+    mutate(SingleFamily = ifelse(SingleFamily > mean(SingleFamily), 1,0),
+           HomeOwn = ifelse(HomeOwn > mean(HomeOwn), 1,0),
+           Edu = ifelse(Edu > mean(Edu), 1,0),
+           White = ifelse(White > mean(White), 1,0),
+           Income = ifelse(Income > mean(Income), 1,0)) %>% 
+    mutate_at(vars(PV:Pump), funs(rescale(., to=c(0,100)) %>% as.numeric(.) %>% 
+                                    round(0))) %>% 
+    mutate_at(vars(Rho.PV:Rho.Pump), funs(rescale(.) %>% as.numeric(.)))
+  
+  
+  fit <- glm.nb(get(tech) ~ SingleFamily+HomeOwn+Edu+White+Income+get(rho)+Bur+Republican+
+                  offset(log(Unit)), data = data)
+  
+  # to compare with predict function result 
+  # new <- data %>% 
+  #   mutate_at(vars(Unit:Exp, Rho.PV:Rho.Pump), funs(mean(.)))
+  # 
+  # new <- new[1:20, ] %>% 
+  #   mutate({{rho}} := seq(0,1, length.out = 20))
+  # 
+  # predict(fit, new, type = "response")
+  
+  
+  x <- data %>%                    
+    dplyr::select(SingleFamily,HomeOwn,Edu,White,Income,rho, Bur, Republican) %>% 
+    summarize_all(mean) %>%
+    uncount(20) %>% 
+    mutate(Republican = seq(0, 13, length.out = 20),
+           cont = 1
+    ) %>% 
+    relocate(cont)
+  
+  x <- x %>% 
+    as.matrix()
+  
+  sims <- 10000
+  pe <- fit %>% tidy() %>% dplyr::select(estimate) %>% as.matrix()
+  vc <- vcov(fit)
+  simbetas <- mvrnorm(sims, pe, vc)
+  xbeta <- x %*% t(simbetas) %>% exp()
+  xbeta <- xbeta*mean(get("Unit", data))
+  
+  pe <- apply(xbeta, 1, mean) 
+  upper <- apply(xbeta, 1, quantile, probs= 0.975)
+  lower <- apply(xbeta, 1, quantile, probs= 0.025)
+  
+  total_pe <- cbind(pe,upper,lower, x %>% 
+                      as.data.frame() %>% 
+                      dplyr::select(Republican)) %>%
+    as.data.frame() %>% 
+    mutate(tech = tech)
+  
+  return(total_pe)
 }
 
-# regrs <- Agg_data(PV_Bel, EV_Bel, bellevue_tracts)
-# regrs <- Agg_data(PV, EV, seattle_tracts)
-# Clustering <- Clustering_plot(regrs, T, "Seattle")
-# plot(Clustering[[1]], border = "grey60")
-# plot(Clustering[[2]], coordinates(Clustering[[1]]), add=T, col=2) 
-# Clustering[[3]]
+### technologies vs. predictor modeling 
+# general string plot +- sd
+s_countf <- function(data, tech){
+  
+  if(tech == "PV"){
+    rho <- "Rho.PV"
+    expected <- "E_PV"
+  }else if(tech == "EV"){
+    rho <- "Rho.EV"
+    expected <- "E_EV"
+  }else{
+    rho <- "Rho.Pump"
+    expected <- "E_Pump"
+  }
+  
+  # data <- data %>%
+  #   mutate_at(vars(HomeOwn:White, Rho.PV:Rho.Pump), funs(rescale(.) %>% as.numeric(.)))
+  
+  data <- data %>% 
+    mutate(SingleFamily = ifelse(SingleFamily > mean(SingleFamily), 1,0),
+           HomeOwn = ifelse(HomeOwn > mean(HomeOwn), 1,0),
+           Edu = ifelse(Edu > mean(Edu), 1,0),
+           White = ifelse(White > mean(White), 1,0),
+           Income = ifelse(Income > mean(Income), 1,0)) %>% 
+    mutate_at(vars(r_PV:r_Pump,Rho.PV:Rho.Pump), funs(rescale(.) %>% as.numeric(.)))
+  
+  
+  fit <- glm.nb(get(tech) ~ SingleFamily+HomeOwn+Edu+White+Income+get(rho)+
+                  offset(log(get("Unit", data))), data = data)
+  
+  x <- data %>%     
+    st_drop_geometry() %>% 
+    dplyr::select(SingleFamily,HomeOwn,Edu,White,Income,rho) %>%
+    summarize_all(mean) %>%   # summarize the means for most variables (can't average Species)
+    uncount(10) %>%           # repeat the row 14 times
+    mutate(cont = 1) %>% 
+    relocate(cont) %>% as.matrix()
+  
+  # x[1,2] <- mean(get("SingleFamily", data)) + 1.645*sd(get("SingleFamily", data))
+  # x[2,3] <- mean(get("HomeOwn", data)) + 1.645*sd(get("HomeOwn", data))
+  # x[3,4] <- mean(get("Edu", data)) + 1.645*sd(get("Edu", data))
+  # x[4,5] <- mean(get("White", data)) + 1.645*sd(get("White", data))
+  # x[5,6] <- mean(get("Income", data)) + 1.645*sd(get("Income", data))
+  # 
+  # x[6,2] <- mean(get("SingleFamily", data)) - 1.645*sd(get("SingleFamily", data))
+  # x[7,3] <- mean(get("HomeOwn", data)) - 1.645*sd(get("HomeOwn", data))
+  # x[8,4] <- mean(get("Edu", data)) - 1.645*sd(get("Edu", data))
+  # x[9,5] <- mean(get("White", data)) - 1.645*sd(get("White", data))
+  # x[10,6] <- mean(get("Income", data)) - 1.645*sd(get("Income", data))
+  
+  
+  x[1,2] <- 1
+  x[2,3] <- 1
+  x[3,4] <- 1
+  x[4,5] <- 1
+  x[5,6] <- 1
+  
+  x[6,2] <- 0
+  x[7,3] <- 0
+  x[8,4] <- 0
+  x[9,5] <- 0
+  x[10,6] <- 0
+  
+  
+  sims <- 10000
+  pe <- fit %>% tidy() %>% dplyr::select(estimate) %>% as.matrix()
+  vc <- vcov(fit)
+  simbetas <- mvrnorm(sims, pe, vc)
+  xbeta <- x %*% t(simbetas) %>% exp()
+  xbeta <- xbeta*mean(get("Unit", data))
+  
+  xbeta <- xbeta[1:5,] - xbeta[6:10,]
+  
+  pe <- apply(xbeta, 1, mean) 
+  upper <- apply(xbeta, 1, quantile, probs= 0.975) 
+  lower <- apply(xbeta, 1, quantile, probs= 0.025)
+  
+  total_pe <- cbind(pe,upper,lower) %>%
+    as.data.frame() %>% 
+    mutate(tech = tech,
+           group = c("SingleFamily","HomeOwn","Edu","White","Income"))
+  
+  return(total_pe)
+}
 
-# save(Density_plot, Point_map, Trend_plot, Relationship_plot, ACS_plot, Agg_data, fill_plot, Clustering_plot, file = "./data/derived/Fun.Rdata")
+# plotting for predictor vs. technologies 
+s_plot <- function(total_pe, tech){
+  Var <- tech
+  
+  if(tech == "PV"){
+    sp <- "Rooftop solar"
+  }else if(tech == "EV"){
+    sp <- "Electric vehicle"
+  }else{
+    sp <- "Heat pump"
+  }
+  
+  fig <- total_pe %>%
+    filter(tech == Var) %>% 
+    ggplot(aes(y = reorder(group,pe),
+               x = pe,
+               xmax = upper,
+               xmin = lower,
+               color = urban)) +
+    geom_pointrangeh(position = position_dodge2v(height = 0.7), fatten = 2, size = 0.8, shape = 15) +
+    # scale_color_grey()+
+    geom_vline(xintercept = 0, color ="black", linetype = "dashed", size = 0.5)+
+    scale_x_continuous(# limits = c(min(total_pe[3]), max(total_pe[2])),
+      # breaks = seq(min(total_pe), max(total_pe), by =2),
+      # labels = c("0%", "+1%", "+2%"),
+      sec.axis =  sec_axis(~ ., name = "")) + # sec.axis = sec_axis(~ . - mean(sp_regime$Adoption), name = "Deviation from Mean %")
+    labs(title = "", x = paste(sp ,"\nadoption\ndifference [%]"), y = "", colour = "Area") +
+    theme_minimal() + 
+    theme(plot.background = element_blank(),
+          panel.grid.minor = element_blank())
+  
+  if(Var != "Pump"){
+    fig <- fig + 
+      theme(aspect.ratio = 2,
+            axis.text.x = element_text(color = "black", size = 12),
+            axis.text.y = element_text(color = "black", size = 12),
+            axis.ticks.x = element_blank(),
+            legend.position = "none",
+            axis.line.x = element_line(color="black"))
+  }else{
+    fig <- fig +
+      ggtitle("") +
+      theme(aspect.ratio = 2,
+            axis.text.x = element_text(color = "black", size = 12),
+            axis.text.y = element_text(color = "black", size = 12),
+            axis.ticks.x = element_blank(),
+            # legend.position = c(0.9, 0.17),
+            legend.position = c(0.9,0.17),
+            axis.line.x = element_line(color="black"),
+            legend.background = element_rect(size=0.5, linetype="solid"))
+  }
+  return(fig)
+}
 
+### line plots for technologies vs. predictors
+countf <- function(data, tech, predictor){
+  
+  if(tech == "PV"){
+    rho <- "Rho.PV"
+    expected <- "E_PV"
+  }else if(tech == "EV"){
+    rho <- "Rho.EV"
+    expected <- "E_EV"
+  }else{
+    rho <- "Rho.Pump"
+    expected <- "E_Pump"
+  }
+  
+  # data <- data %>% st_drop_geometry() %>% 
+  #   mutate_at(vars(HomeOwn:White, Rho.PV:Rho.Pump), funs(rescale(.) %>% as.numeric(.)))
+  
+  data <- data %>% st_drop_geometry() %>% 
+    mutate(SingleFamily = ifelse(SingleFamily > mean(SingleFamily), 1,0),
+           HomeOwn = ifelse(HomeOwn > mean(HomeOwn), 1,0),
+           Edu = ifelse(Edu > mean(Edu), 1,0),
+           White = ifelse(White > mean(White), 1,0),
+           Income = ifelse(Income > mean(Income), 1,0)) %>% 
+    mutate_at(vars(r_PV:r_Pump,Rho.PV:Rho.Pump), funs(rescale(.) %>% as.numeric(.)))
+  
+  
+  fit <- glm.nb(get(tech, data) ~ SingleFamily+HomeOwn+Edu+White+Income+get(rho, data)+
+                  offset(log(get("Unit", data))), data = data)
+  
+  # x <-data %>%                    
+  #   dplyr::select(SingleFamily,HomeOwn,Edu,White,Income,rho) %>% 
+  #   summarize_all(mean) %>%
+  #   uncount(20) %>% 
+  #   mutate({{predictor}} := seq(mean(get(predictor, data)) - 1.645*sd(get(predictor, data)), 
+  #                               mean(get(predictor, data)) + 1.645*sd(get(predictor, data)), length.out = 20),
+  #          cont = 1
+  #   ) %>% 
+  #   relocate(cont)
+  
+  x <-data %>%                    
+    dplyr::select(SingleFamily,HomeOwn,Edu,White,Income,rho) %>% 
+    summarize_all(mean) %>%
+    uncount(20) %>% 
+    mutate({{predictor}} := seq(0,1, length.out = 20),
+           cont = 1
+    ) %>% 
+    relocate(cont)
+  
+  x <- x %>% 
+    as.matrix()
+  
+  sims <- 10000
+  pe <- fit %>% tidy() %>% dplyr::select(estimate) %>% as.matrix()
+  vc <- vcov(fit)
+  simbetas <- mvrnorm(sims, pe, vc)
+  xbeta <- x %*% t(simbetas) %>% exp()
+  xbeta <- xbeta*mean(get("Unit", data))
+  
+  pe <- apply(xbeta, 1, mean) 
+  upper <- apply(xbeta, 1, quantile, probs= 0.975)
+  lower <- apply(xbeta, 1, quantile, probs= 0.025)
+  
+  total_pe <- cbind(pe,upper,lower, x %>% 
+                      as.data.frame() %>% 
+                      mutate({{predictor}} := rescale(get(predictor),to=c(0,1))) %>% 
+                      dplyr::select(predictor)) %>%
+    as.data.frame() %>% 
+    mutate(Tech = tech,
+           Var = predictor) %>% 
+    rename(Value = predictor)
+  
+  return(total_pe)
+}

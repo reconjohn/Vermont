@@ -48,6 +48,7 @@ data %>%
   theme_bw() 
 
 
+# by year and town
 data %>% 
   group_by(Year, City) %>% 
   summarise(install = n()) %>%
@@ -59,4 +60,4 @@ data %>%
 
 
 save(data, file = "./data/derived/PV.Rdata")
-write_csv(data, path = "../heat_map/data/derived/PV_heat.csv")
+write_csv(data, path = "../heat_map/data/derived/PV_heat.csv") # for mapbox mapping heat_map
